@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, PipeTransform } from '@nestjs/common';
-import { ID_MESSAGE, ID_PATTERN } from '../id';
+import { ID_MESSAGE, ID_PATTERN } from '../utils';
 
 /** Validates a path id and keeps it a string, so a huge or imprecise number can't reach the database. */
 @Injectable()

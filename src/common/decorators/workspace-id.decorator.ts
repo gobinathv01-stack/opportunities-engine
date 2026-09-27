@@ -1,5 +1,5 @@
 import { BadRequestException, createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { SLUG } from '../slug';
+import { SLUG } from '../utils';
 
 /** Tenant scope: every request must name its workspace in X-Workspace-Id. */
 export const WorkspaceId = createParamDecorator((_: unknown, ctx: ExecutionContext): string => {

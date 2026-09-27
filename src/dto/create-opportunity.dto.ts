@@ -1,6 +1,6 @@
 import { Transform } from 'class-transformer';
 import { IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
-import { SLUG, SLUG_MESSAGE } from '../common/slug';
+import { SLUG, SLUG_MESSAGE } from '../common/utils';
 import { OpportunityStatus } from '../entities/opportunity.entity';
 
 export const STATUSES: OpportunityStatus[] = ['open', 'won', 'lost', 'abandoned'];

@@ -1,7 +1,6 @@
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, Matches, Max, Min } from 'class-validator';
-import { ID_MESSAGE, ID_PATTERN } from '../common/id';
-import { SLUG, SLUG_MESSAGE } from '../common/slug';
+import { ID_MESSAGE, ID_PATTERN, SLUG, SLUG_MESSAGE } from '../common/utils';
 
 export class ListOpportunitiesQuery {
   @Matches(SLUG, { message: `stage ${SLUG_MESSAGE}` })
