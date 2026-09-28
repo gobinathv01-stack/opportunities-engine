@@ -1,0 +1,30 @@
+README.md
+  s_7e964dff6920cd::t_28d4db774a92d4 158-161,163-164
+  s_7e964dff6920cd::t_07de08e66883ad 169-177
+  s_7e964dff6920cd::t_a902f16b4ae2bb 64-66,68-73,75-82,84-91,93-105,108-119,121-131,133-137
+  h_ec90f91981ff74 14,35-36,51,74,92,106-107,120,132
+  s_7e964dff6920cd::t_17457bcd9b19b8 162
+  s_7e964dff6920cd::t_3fdcd20afbe58a 178
+  s_7e964dff6920cd::t_842987e3b59275 50,193
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "272a3e09319fde712a827a45a742373ae7aab2b5",
+  "prompts": {},
+  "humans": {
+    "h_ec90f91981ff74": {
+      "author": "gobinath.v <gobinath.v@gupshup.io>"
+    }
+  },
+  "sessions": {
+    "s_7e964dff6920cd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8782b913-8d2b-47a0-9623-0825ef32b022",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "gobinath.v <gobinath.v@gupshup.io>"
+    }
+  }
+}
