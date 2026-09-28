@@ -11,7 +11,7 @@ A small multi-tenant CRM service (NestJS, TypeScript, PostgreSQL) whose real sub
 node scripts/setup.js
 ```
 
-Works the same on Windows, macOS and Linux: it detects whichever container engine you have (`docker compose`, `podman compose`, or standalone `docker-compose`) and runs it. It starts Postgres, applies the migrations, **seeds a small dataset** (6 workspaces, 6-10 stages each, 15-50 deals each), starts the API on <http://localhost:3000> and the background worker, and **runs the test suite** in its own container (77 tests, about 6 s). Watch for `Tests: 77 passed`. Stop with Ctrl+C, then `docker compose down -v` (or `podman compose down -v`).
+Works the same on Windows, macOS and Linux: it detects whichever container engine you have (`docker compose`, `podman compose`, or standalone `docker-compose`) and runs it. It starts Postgres, applies the migrations, **seeds a small dataset** (6 workspaces, 6-10 stages each, 15-50 deals each), starts the API on [http://localhost:3000](http://localhost:3000) and the background worker, and **runs the test suite** in its own container (77 tests, about 6 s). Watch for `Tests: 77 passed`. Stop with Ctrl+C, then `docker compose down -v` (or `podman compose down -v`).
 
 Ports can be changed if 3000 or 5432 are taken, as plain arguments (not a shell env-var prefix, which differs between bash/cmd/PowerShell): `node scripts/setup.js API_PORT=3010 DB_PORT=5433`.
 
@@ -32,6 +32,8 @@ curl -s localhost:3000/bulk-moves/<id> -H "X-Workspace-Id: acme"
 # repeating the same POST returns the same job (header Idempotent-Replayed: true), it does not run twice
 ```
 
+
+
 ## Run without Docker
 
 Needs Node 22 and PostgreSQL 16 (defaults: `postgres://opps:opps@localhost:5432/opps`; override with `DATABASE_URL`). No local Postgres install? Use the hybrid path below instead.
@@ -45,6 +47,8 @@ npm run start:worker     # the background worker: a separate process
 npm test                 # needs Postgres; creates and uses its own database `opps_test`
 ```
 
+
+
 ### Hybrid: Postgres in a container, API and worker running natively
 
 No local Postgres install needed, but the API and worker run as plain `node` processes on the host — faster iteration than rebuilding a container image on every change.
@@ -57,17 +61,80 @@ Same auto-detection, port auto-pick, and self-heal-on-rerun as the full one-comm
 
 ## API
 
-Every request needs `X-Workspace-Id: <workspace slug>` (a tenant; no auth, as specified). Stages are identified by short keys such as `contacted`.
+Every request needs `X-Workspace-Id: <workspace slug>` (a tenant; no auth, as specified). Opportunity ids are bigints as strings (up to 18 digits); bulk job ids are UUIDs. Stage keys are short slugs such as `contacted`. Errors use Nest's default shape: `{"statusCode": 409, "message": "...", "error": "Conflict"}`.
 
-| Endpoint | Purpose |
-|---|---|
-| `POST /opportunities` `{name, value, owner_id, stage, status?}` | Create a deal |
-| `POST /opportunities/:id/move` `{stage}` | Move one deal and record a transition |
-| `GET /opportunities?stage=&limit=&cursor=` | List a stage, keyset-paginated (`next_cursor`) |
-| `POST /bulk-moves` `{filter, target_stage}` + header `Idempotency-Key` | Submit a bulk move: **202 and a job handle** |
-| `GET /bulk-moves/:id` | Progress: state, phase (`snapshot` then `move`), health, counts, percent, error |
+### `POST /opportunities` — create a deal
 
-Bulk `filter` fields, all optional and ANDed: `stage`, `owner`, `status` (list), `value` `{min,max}`, `created` `{from,to}` (inclusive; a date-only `to` includes that whole day, UTC). Errors: 400 invalid input, 409 (a bulk move is already active in this workspace), 422 (unknown stage, or an `Idempotency-Key` reused for a different request). Submit only records the job, so it is instant whatever the size. While the worker is still building the list of deals (`phase: snapshot`) `total`, `remaining` and `percent` are `null` and `snapshotted` counts the deals found so far. A filter matching more than the cap (`BULK_MAX_ITEMS`, default 1,000,000) makes the job `failed` with a reason.
+Not a stage change: writes no transition. `status` defaults to `open`.
+
+```jsonc
+// request
+{ "name": "Acme renewal", "value": 12000, "owner_id": "u-1", "stage": "contacted", "status": "open" }
+```
+
+```jsonc
+// 201
+{
+  "id": "42", "workspace_id": "acme", "stage": "contacted", "name": "Acme renewal",
+  "value": 12000, "status": "open", "owner_id": "u-1", "version": 1,
+  "created_at": "2026-01-01T00:00:00.000Z", "updated_at": "2026-01-01T00:00:00.000Z"
+}
+```
+
+Errors: `422` unknown stage.
+
+### `POST /opportunities/:id/move` — move one deal and record a transition
+
+```jsonc
+// request
+{ "stage": "qualified" }
+```
+
+`200`: the same Opportunity shape as above, `stage` and `version` updated. Errors: `404` not found, `422` unknown target stage, `409` already in that stage.
+
+### `GET /opportunities?stage=&limit=&cursor=` — list a stage, keyset-paginated
+
+`stage` required; `limit` 1-200 (default 50); `cursor` is the `id` of the last item of the previous page.
+
+```jsonc
+// 200
+{
+  "items": [ { "id": "42", "workspace_id": "acme", "stage": "contacted", "...": "..." } ],
+  "next_cursor": "57"   // null on the last page
+}
+```
+
+
+
+### `POST /bulk-moves` — submit a bulk move
+
+Header `Idempotency-Key` required (1-128 chars). `filter` fields all optional and ANDed: `stage`, `owner`, `status` (list), `value` `{min,max}`, `created` `{from,to}` (inclusive; a date-only `to` includes that whole day, UTC).
+
+```jsonc
+// request, header Idempotency-Key: try-1
+{
+  "filter": { "stage": "contacted", "status": ["open"], "value": { "min": 1000 }, "created": { "from": "2026-01-01", "to": "2026-03-31" } },
+  "target_stage": "closed-won"
+}
+```
+
+```jsonc
+// 202 — submit only records the job, so this is instant whatever the size
+{
+  "id": "b6f1c2a0-6e3a-4b8b-9b2a-1e2f3a4b5c6d", "state": "queued", "phase": "snapshot",
+  "health": "queued", "target_stage": "closed-won",
+  "filter": { "stage": "contacted", "status": ["open"], "value": { "min": 1000 }, "created": { "from": "2026-01-01", "to": "2026-03-31" } },
+  "snapshotted": 0, "total": null, "processed": 0, "moved": 0, "skipped_conflict": 0,
+  "remaining": null, "percent": null, "attempt": 0,
+  "created_at": "2026-01-01T00:00:00.000Z", "started_at": null, "last_progress_at": null, "finished_at": null, "error": null
+}
+```
+
+A retried submit with the same key and the same body returns this same job unchanged, with response header `Idempotent-Replayed: true`, and does no work. Errors: `400` invalid input (e.g. `filter.value.min > max`); `409` a bulk move is already active in this workspace (body includes `active_job_id`); `422` unknown stage, or this `Idempotency-Key` reused for a different request body. A filter matching more than the cap (`BULK_MAX_ITEMS`, default 1,000,000) makes the job `failed` with a reason, not truncated.
+
+### `GET /bulk-moves/:id` — progress
+
+Same response shape as submit's, evolving as the worker runs. `health` is one of `queued | waiting | progressing | slow | stuck | stalled | completed | failed`, computed from committed timestamps and counters (never an in-memory counter). While `phase` is `snapshot`, `total`/`remaining`/`percent` are `null` and `snapshotted` counts deals found so far; once `phase` is `move`, `total` is fixed and `percent` = `processed / total`. Errors: `404` job not found.
 
 ## What is and is not implemented
 
@@ -88,9 +155,26 @@ Bulk `filter` fields, all optional and ANDed: `stage`, `owner`, `status` (list),
 - An unknown workspace behaves like an empty one (no tenant-existence leak).
 - `value` is stored as `numeric(14,2)` and returned as a JSON number.
 
+## Seed data
+
+Both seed scripts live in `src/scripts/` (shared logic in `seed-lib.ts`), are deterministic (`setseed()` per workspace, so a re-run reproduces the same rows), safe to re-run (a workspace that already has deals is left alone — `npm run db:reset` truncates everything first if you want a clean redo), and give every deal past its first stage the transition history it would really have (stage 1 → 2 → ... → current), values skewed low ($1k-$250k), and `created_at` spread over the last ~18 months.
+
+- **`npm run seed:small`** — the demo dataset (also what `node scripts/setup.js` seeds automatically): 6 workspaces (`acme`, `globex`, `initech`, `umbrella`, `hooli`, `stark`), 6-10 stages each, 15-50 deals each, front-loaded across the pipeline (most deals in the earlier stages).
+- **`npm run seed:large`** — the benchmark dataset, matching the brief's data spec exactly: 1 large workspace `bigco` (500,000 deals across 12 stages, front-loaded 22% down to 1%) plus 5 small workspaces `small-1`..`small-5` (2,000-4,000 deals each) so isolation is measurable. `npm run bench:prepare` runs this into a separate, throwaway database (its name must contain `bench`, e.g. `opps_bench` — the script refuses anything else before it drops and recreates it), so it never touches your dev data; see `BENCHMARKS.md`.
+
 ## Tests
 
 `npm test` runs 77 tests against a real Postgres (no mocks), in a separate `opps_test` database. The ones that matter, each verified to **fail when its safety mechanism is removed**: idempotent retries and simultaneous submits; the one-active-job rule; killed-between-chunks and killed-mid-chunk resume; fencing of a worker that lost its lease; a manual edit before or during a chunk; snapshot semantics, including killing the worker between and in the middle of snapshot batches and the cap; contention as back-pressure; time-sliced fairness; a chunk reading only its own items; and database constraints checked by bypassing the application.
+
+### How to check each of the five required properties yourself
+
+| Property | Automated proof | Live check |
+|---|---|---|
+| 1. Idempotent | `test/bulk-submit.spec.ts` › `idempotency` (retry, reordered fields, an 8-way simultaneous burst, per-workspace keys) | Resubmit the same `POST /bulk-moves` with the same `Idempotency-Key` (see the "Try it" block above) — same job back, header `Idempotent-Replayed: true`, `moved` unchanged |
+| 2. Resumable | `test/bulk-worker.spec.ts` › `resumable` and `snapshot phase` (killed between/mid chunk, killed between/mid snapshot batch) | `npm run bench:prepare && npm run bench` kills the worker at 30,000 rows and reports time-to-completion plus a correctness check (`BENCHMARKS.md`) |
+| 3. Observably progressing | `test/bulk-worker.spec.ts` › `health (computed from committed data only)` | Poll `GET /bulk-moves/:id` while a job runs: `health` moves `queued → progressing → completed`, and reports `slow`/`stuck`/`stalled` from committed timestamps — restart the API mid-job and it still reads the same state |
+| 4. Correct under concurrent edits | `test/bulk-worker.spec.ts` › `correct under concurrent edits` (a manual move before, during, and racing a chunk) | Submit a bulk move, then `POST /opportunities/:id/move` one of its matching deals by hand before the worker reaches it — it comes back in `skipped_conflict`, never overwritten |
+| 5. Well-behaved | `test/bulk-wellbehaved.spec.ts` (yields to a smaller job, fair time-slicing, lock contention as back-pressure, its own connection pool) | `BENCHMARKS.md`'s p95/p99 interactive latency, measured in the same and a different workspace while a 492,332-deal job runs |
 
 ## Benchmarks
 
