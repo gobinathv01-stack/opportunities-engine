@@ -1,0 +1,29 @@
+package.json
+  s_d1f76707f261f9::t_2e9c099e0f9bce 14
+  s_d1f76707f261f9::t_8273a25622e80a 7
+  s_d1f76707f261f9::t_0e0dce3495f6a8 11
+  s_d1f76707f261f9::t_ae6ace98fc82a2 44-48,51-58
+  s_d1f76707f261f9::t_81d30da6a845f5 17
+  s_d1f76707f261f9::t_fb0c7a8994db78 15-16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0f9c2964361c2e9c4e8d435b7553344b498c8e7d",
+  "prompts": {},
+  "humans": {
+    "h_ec90f91981ff74": {
+      "author": "gobinath.v <gobinath.v@gupshup.io>"
+    }
+  },
+  "sessions": {
+    "s_d1f76707f261f9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "651f2017-1c99-4fb4-a808-f352cc3178f6",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "gobinath.v <gobinath.v@gupshup.io>"
+    }
+  }
+}
