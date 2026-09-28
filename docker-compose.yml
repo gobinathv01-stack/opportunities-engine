@@ -1,0 +1,67 @@
+# One command:   docker compose up --build
+# It starts Postgres, applies the migrations, seeds a small dataset (6 workspaces, 6-10 stages each, 15-50 deals each),
+# starts the API (http://localhost:3000) and the background worker, and runs the test suite.
+# The test suite uses its own database (opps_test) so it never touches the seeded data.
+# Ports can be changed:  API_PORT=3010 DB_PORT=5433 docker compose up --build
+# The image is built once (by `migrate`) and reused by the other services.
+x-app: &app
+  image: opportunities-engine
+  pull_policy: never
+  environment: &env
+    DATABASE_URL: postgres://opps:opps@postgres:5432/opps
+    TEST_DATABASE_URL: postgres://opps:opps@postgres:5432/opps_test
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: opps
+      POSTGRES_PASSWORD: opps
+      POSTGRES_DB: opps
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U opps -d opps"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # Applies migrations and seeds the small dataset, then exits. Safe to run again.
+  migrate:
+    <<: *app
+    build: .
+    pull_policy: build
+    command: ["sh", "-c", "node dist/scripts/migrate.js && node dist/scripts/seed-small.js"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *app
+    command: ["node", "dist/main.js"]
+    ports:
+      - "${API_PORT:-3000}:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    <<: *app
+    command: ["node", "dist/worker.main.js"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  test:
+    <<: *app
+    command: ["npm", "test"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
+volumes:
+  pgdata:

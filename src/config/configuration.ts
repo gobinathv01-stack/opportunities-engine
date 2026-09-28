@@ -1,7 +1,7 @@
 /** The only place that reads environment variables. */
 export const config = {
   port: Number(process.env.PORT ?? 3000),
-  databaseUrl: process.env.DATABASE_URL ?? '',
+  databaseUrl: process.env.DATABASE_URL || 'postgres://opps:opps@localhost:5432/opps',
   dbPoolMax: Number(process.env.DB_POOL_MAX ?? 10),
   bulk: {
     /** Safety valve: a filter matching more than this fails during its snapshot (the brief's size is 50,000). */
