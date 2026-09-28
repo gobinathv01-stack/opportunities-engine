@@ -1,0 +1,33 @@
+BENCHMARKS.md
+  s_7e964dff6920cd::t_70203b6abd17d1 112
+  s_7e964dff6920cd::t_bc53ba1ac5e165 133
+  s_7e964dff6920cd::t_ca3f697194dab3 37-40,42,51,53-54,60,64-66,68,72,76-81,84-87,97-100,104,108,116-119
+  s_7e964dff6920cd::t_4c235bde903d19 121
+  s_7e964dff6920cd::t_06b57da5ec9f04 131
+README.md
+  s_7e964dff6920cd::t_f43f5f8173fb1f 149
+  s_7e964dff6920cd::t_11d5a2620b791b 70,73-76,78,80-81,83-84,90-91
+  s_7e964dff6920cd::t_125458f07fcad9 14,56,60,62-68,87,93-94,101,112,114-116,120,122-123,127,141,153
+  s_7e964dff6920cd::t_d1093c5be504a2 18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "780f772a7dd9497a7edf986f93695e3ecdffde40",
+  "prompts": {},
+  "humans": {
+    "h_ec90f91981ff74": {
+      "author": "gobinath.v <gobinath.v@gupshup.io>"
+    }
+  },
+  "sessions": {
+    "s_7e964dff6920cd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8782b913-8d2b-47a0-9623-0825ef32b022",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "gobinath.v <gobinath.v@gupshup.io>"
+    }
+  }
+}
